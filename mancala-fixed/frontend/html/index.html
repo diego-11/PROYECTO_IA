@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Mancala Kalah — Motores Paralelos</title>
+<style>
+:root {
+  --bg:#0f0e0b; --surface:#1a1916; --surface2:#232018;
+  --gold:#c9a84c; --gold-dim:#7a6230; --gold-glow:rgba(201,168,76,.35);
+  --cream:#e8dfc8; --rust:#8b3a2a; --green:#2a5c3f;
+  --p0:#c9a84c; --p1:#c06040; --text:#c8bfa8; --radius:12px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,serif;
+  min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:20px 12px 48px}
+
+header{text-align:center;margin-bottom:24px;animation:fadeDown .6s ease both}
+header h1{font-size:clamp(1.8rem,4vw,3rem);font-weight:300;color:var(--cream);letter-spacing:.05em}
+header h1 span{color:var(--gold);font-style:italic}
+header p{font-family:'Space Mono',monospace;font-size:.65rem;color:var(--gold-dim);
+  letter-spacing:.15em;text-transform:uppercase;margin-top:4px}
+
+/* Controls */
+.controls{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:20px;
+  animation:fadeDown .7s ease .1s both}
+.cg{display:flex;flex-direction:column;gap:3px}
+.cg label{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:.1em;
+  color:var(--gold-dim);text-transform:uppercase}
+.cg select,.cg input{background:var(--surface);border:1px solid var(--gold-dim);color:var(--cream);
+  padding:7px 10px;border-radius:6px;font-family:'Space Mono',monospace;font-size:.75rem;
+  outline:none;cursor:pointer;transition:border-color .2s;min-width:110px}
+.cg select:hover,.cg input:hover{border-color:var(--gold)}
+.cg input{min-width:220px}
+
+/* Buttons */
+.btn-row{display:flex;gap:8px;justify-content:center;margin-bottom:18px;flex-wrap:wrap}
+button{font-family:'Space Mono',monospace;font-size:.7rem;letter-spacing:.08em;
+  text-transform:uppercase;padding:9px 18px;border-radius:6px;border:1px solid;
+  cursor:pointer;transition:all .18s}
+.btn-p{background:var(--gold);border-color:var(--gold);color:var(--bg);font-weight:700}
+.btn-p:hover{background:#dbb85c} .btn-p:disabled{opacity:.4;cursor:not-allowed}
+.btn-s{background:transparent;border-color:var(--gold-dim);color:var(--gold-dim)}
+.btn-s:hover{border-color:var(--gold);color:var(--gold)}
+
+/* Board wrapper */
+.board-wrap{width:100%;max-width:740px;animation:fadeUp .6s ease .2s both}
+.player-label{font-family:'Space Mono',monospace;font-size:.65rem;letter-spacing:.1em;
+  text-transform:uppercase;padding:4px 0 6px;display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%}
+.p0-label{color:var(--p0);justify-content:flex-end}
+.p1-label{color:var(--p1)}
+.p0-label .dot{background:var(--p0)} .p1-label .dot{background:var(--p1)}
+.turn-badge{font-size:.55rem;background:var(--gold-dim);color:var(--cream);
+  padding:2px 6px;border-radius:4px;display:none}
+.turn-badge.show{display:inline}
+
+/* Board grid */
+.board{display:grid;grid-template-columns:72px repeat(6,1fr) 72px;
+  grid-template-rows:1fr 1fr;gap:6px;
+  background:var(--surface);border:1px solid #2e2c26;border-radius:var(--radius);padding:14px}
+
+/* Kalahas */
+.kalaha{grid-row:1/3;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;background:var(--bg);border-radius:40px;border:2px solid;
+  padding:10px 8px;gap:4px;transition:box-shadow .3s}
+.k0{border-color:var(--p0)} .k1{border-color:var(--p1)}
+.kalaha .kv{font-family:'Crimson Pro',serif;font-size:2rem;font-weight:600;color:var(--cream)}
+.kalaha .kl{font-family:'Space Mono',monospace;font-size:.5rem;letter-spacing:.1em;
+  text-transform:uppercase;opacity:.5}
+
+/* Pits */
+.pit{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:var(--bg);border-radius:50%;border:2px solid #2e2c26;
+  aspect-ratio:1;cursor:pointer;transition:all .18s;gap:1px;position:relative;
+  min-height:52px}
+.pit:hover:not(.off){border-color:var(--gold);transform:scale(1.07)}
+.pit.on{border-color:var(--gold);box-shadow:0 0 14px var(--gold-glow)}
+.pit.off{cursor:not-allowed;opacity:.38}
+.pit.off:hover{transform:none;border-color:#2e2c26}
+.pit .pv{font-family:'Crimson Pro',serif;font-size:1.35rem;font-weight:600;color:var(--cream);line-height:1}
+.pit .pi{font-family:'Space Mono',monospace;font-size:.48rem;color:#5a5748;line-height:1}
+.pit.flash{animation:flash .4s ease}
+.pit.capture-flash{animation:captureFlash .5s ease}
+
+/* P1 row reversed visually: pits 12,11,10,9,8,7 left→right */
+.r1{grid-row:1;grid-column:2/8;display:contents}
+.r0{grid-row:2;grid-column:2/8;display:contents}
+
+/* Status */
+.status-bar{margin-top:12px;padding:10px 16px;background:var(--surface);
+  border-radius:8px;border-left:3px solid var(--gold);font-family:'Space Mono',monospace;
+  font-size:.68rem;color:var(--cream);min-height:40px;display:flex;align-items:center;gap:8px}
+.spinner{width:13px;height:13px;border:2px solid var(--gold-dim);border-top-color:var(--gold);
+  border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;display:none}
+.loading .spinner{display:block}
+
+/* Stats */
+.stats-panel{margin-top:16px;width:100%;max-width:740px;background:var(--surface);
+  border-radius:var(--radius);border:1px solid #2e2c26;padding:14px 18px;
+  animation:fadeUp .5s ease .3s both}
+.stats-panel h3{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:.15em;
+  text-transform:uppercase;color:var(--gold-dim);margin-bottom:10px}
+.sg{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.si{background:var(--bg);border-radius:6px;padding:9px 11px}
+.si .sk{font-family:'Space Mono',monospace;font-size:.55rem;color:var(--gold-dim);
+  text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px}
+.si .sv{font-family:'Crimson Pro',serif;font-size:1.25rem;color:var(--cream);font-weight:600}
+
+/* History */
+.history{margin-top:14px;width:100%;max-width:740px;background:var(--surface);
+  border-radius:var(--radius);border:1px solid #2e2c26;padding:14px 18px}
+.history h3{font-family:'Space Mono',monospace;font-size:.6rem;letter-spacing:.15em;
+  text-transform:uppercase;color:var(--gold-dim);margin-bottom:8px}
+.hlist{display:flex;flex-wrap:wrap;gap:5px;max-height:72px;overflow-y:auto}
+.hi{font-family:'Space Mono',monospace;font-size:.6rem;padding:2px 7px;
+  border-radius:4px;border:1px solid #2e2c26;color:var(--text)}
+.hi.h0{border-color:var(--gold-dim);color:var(--gold)}
+.hi.h1{border-color:#6a2a1a;color:var(--rust)}
+
+/* API url */
+.api-row{margin-top:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center}
+.api-row label{font-family:'Space Mono',monospace;font-size:.6rem;color:var(--gold-dim);
+  text-transform:uppercase;letter-spacing:.1em}
+.api-row input{background:var(--surface);border:1px solid var(--gold-dim);color:var(--cream);
+  padding:6px 12px;border-radius:6px;font-family:'Space Mono',monospace;font-size:.68rem;
+  width:260px;outline:none}
+
+@keyframes fadeDown{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes flash{0%{transform:scale(1)}50%{transform:scale(1.18);box-shadow:0 0 18px var(--gold-glow)}100%{transform:scale(1)}}
+@keyframes captureFlash{0%{background:var(--bg)}50%{background:#3a1a0a}100%{background:var(--bg)}}
+@keyframes winPulse{0%,100%{box-shadow:0 0 0 var(--gold)}50%{box-shadow:0 0 20px var(--gold)}}
+.win-glow{animation:winPulse 1.4s ease infinite}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Mancala <span>Kalah</span></h1>
+  <p>Motores paralelos · Alpha-Beta + MCTS · OpenMP</p>
+</header>
+
+<!-- Controls -->
+<div class="controls">
+  <div class="cg">
+    <label>Modo</label>
+    <select id="gameMode">
+      <option value="hva">Humano vs IA</option>
+      <option value="ava">IA vs IA</option>
+    </select>
+  </div>
+  <div class="cg">
+    <label>Algoritmo IA</label>
+    <select id="algo">
+      <option value="alphabeta">Alpha-Beta</option>
+      <option value="mcts">MCTS</option>
+    </select>
+  </div>
+  <div class="cg" id="dg">
+    <label>Profundidad</label>
+    <select id="depth">
+      <option value="4">4</option>
+      <option value="6">6</option>
+      <option value="8" selected>8</option>
+      <option value="10">10</option>
+      <option value="12">12</option>
+    </select>
+  </div>
+  <div class="cg" id="sg" style="display:none">
+    <label>Simulaciones</label>
+    <select id="sims">
+      <option value="1000">1 000</option>
+      <option value="5000">5 000</option>
+      <option value="10000" selected>10 000</option>
+      <option value="50000">50 000</option>
+    </select>
+  </div>
+  <div class="cg">
+    <label>Hilos CPU</label>
+    <select id="threads">
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="4" selected>4</option>
+      <option value="8">8</option>
+    </select>
+  </div>
+</div>
+
+<div class="btn-row">
+  <button class="btn-p" id="btnNew">Nueva Partida</button>
+  <button class="btn-p" id="btnAI" disabled>Mover IA</button>
+  <button class="btn-s" id="btnAuto">▶ Auto</button>
+</div>
+
+<!-- Board -->
+<div class="board-wrap">
+  <div class="player-label p1-label">
+    <div class="dot"></div>
+    Jugador 1 (IA)
+    <span class="turn-badge" id="t1">TURNO</span>
+  </div>
+
+  <div class="board" id="board">
+    <!-- K1 left -->
+    <div class="kalaha k1" style="grid-column:1;grid-row:1/3">
+      <div class="kv" id="kv1">0</div>
+      <div class="kl">K1</div>
+    </div>
+    <!-- P1 pits row 1: displayed right-to-left = pits 12,11,10,9,8,7 -->
+    <div class="r1">
+      <div class="pit off" data-pit="12" onclick="humanMove(12)"><div class="pv">4</div><div class="pi">12</div></div>
+      <div class="pit off" data-pit="11" onclick="humanMove(11)"><div class="pv">4</div><div class="pi">11</div></div>
+      <div class="pit off" data-pit="10" onclick="humanMove(10)"><div class="pv">4</div><div class="pi">10</div></div>
+      <div class="pit off" data-pit="9"  onclick="humanMove(9)" ><div class="pv">4</div><div class="pi">9</div></div>
+      <div class="pit off" data-pit="8"  onclick="humanMove(8)" ><div class="pv">4</div><div class="pi">8</div></div>
+      <div class="pit off" data-pit="7"  onclick="humanMove(7)" ><div class="pv">4</div><div class="pi">7</div></div>
+    </div>
+    <!-- P0 pits row 2: left-to-right = pits 0,1,2,3,4,5 -->
+    <div class="r0">
+      <div class="pit on"  data-pit="0" onclick="humanMove(0)"><div class="pv">4</div><div class="pi">0</div></div>
+      <div class="pit on"  data-pit="1" onclick="humanMove(1)"><div class="pv">4</div><div class="pi">1</div></div>
+      <div class="pit on"  data-pit="2" onclick="humanMove(2)"><div class="pv">4</div><div class="pi">2</div></div>
+      <div class="pit on"  data-pit="3" onclick="humanMove(3)"><div class="pv">4</div><div class="pi">3</div></div>
+      <div class="pit on"  data-pit="4" onclick="humanMove(4)"><div class="pv">4</div><div class="pi">4</div></div>
+      <div class="pit on"  data-pit="5" onclick="humanMove(5)"><div class="pv">4</div><div class="pi">5</div></div>
+    </div>
+    <!-- K0 right -->
+    <div class="kalaha k0" style="grid-column:8;grid-row:1/3">
+      <div class="kv" id="kv0">0</div>
+      <div class="kl">K0</div>
+    </div>
+  </div>
+
+  <div class="player-label p0-label">
+    <span class="turn-badge" id="t0">TURNO</span>
+    Jugador 0 (Humano)
+    <div class="dot"></div>
+  </div>
+</div>
+
+<!-- Status -->
+<div class="status-bar" id="sb">
+  <div class="spinner"></div>
+  <span id="sm">Listo. Es el turno del Jugador 0.</span>
+</div>
+
+<!-- Stats panel -->
+<div class="stats-panel">
+  <h3>Estadísticas del Motor</h3>
+  <div class="sg">
+    <div class="si"><div class="sk">Algoritmo</div><div class="sv" id="sAlgo">—</div></div>
+    <div class="si"><div class="sk">Movimiento</div><div class="sv" id="sMove">—</div></div>
+    <div class="si"><div class="sk">Evaluación</div><div class="sv" id="sEval">—</div></div>
+    <div class="si"><div class="sk">Tiempo ms</div><div class="sv" id="sTime">—</div></div>
+    <div class="si"><div class="sk">Hilos</div><div class="sv" id="sThreads">—</div></div>
+    <div class="si"><div class="sk">Nodos/Rollouts</div><div class="sv" id="sNodes">—</div></div>
+    <div class="si"><div class="sk">Podas/Prof.avg</div><div class="sv" id="sPrunes">—</div></div>
+    <div class="si"><div class="sk">Win Rate</div><div class="sv" id="sWR">—</div></div>
+  </div>
+</div>
+
+<!-- History -->
+<div class="history">
+  <h3>Historial</h3>
+  <div class="hlist" id="hlist"></div>
+</div>
+
+<!-- API URL -->
+<div class="api-row">
+  <label>API URL</label>
+  <input type="text" id="apiUrl" value="http://localhost:8000"/>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let board   = [4,4,4,4,4,4,0, 4,4,4,4,4,4,0];
+let side    = 0;
+let over    = false;
+let busy    = false;
+let auto    = false;
+let autoTmr = null;
+
+// ═══════════════════════════════════════════════════════════
+// KALAH RULES (mirrors board.hpp exactly after fix)
+// ═══════════════════════════════════════════════════════════
+function oppPit(pit) {
+  // Face-to-face layout: column sums always = 12
+  // P0: 0,1,2,3,4,5  P1: 7,8,9,10,11,12
+  // oppPit(i) = 12 - i  for ALL pits
+  return 12 - pit;
+}
+
+function kalaha(s) { return s === 0 ? 6 : 13; }
+function pitStart(s) { return s === 0 ? 0 : 7; }
+
+function isTerminal(b) {
+  let s0=0, s1=0;
+  for(let i=0;i<6;i++)  s0+=b[i];
+  for(let i=7;i<13;i++) s1+=b[i];
+  return s0===0 || s1===0;
+}
+
+function applyMove(b, s, pit) {
+  const nb = [...b];
+  let seeds = nb[pit];
+  nb[pit] = 0;
+
+  const myK  = kalaha(s);
+  const oppK = kalaha(1-s);
+
+  let idx = pit;
+  while (seeds > 0) {
+    idx = (idx + 1) % 14;
+    if (idx === oppK) continue;   // skip opponent's kalaha
+    nb[idx]++;
+    seeds--;
+  }
+
+  // Extra turn: last seed lands in own kalaha
+  const extraTurn = (idx === myK);
+
+  // Capture: last seed lands in own EMPTY pit (now has exactly 1),
+  //          AND opposite pit has seeds
+  const ps = pitStart(s);
+  const inOwnSide = idx >= ps && idx < ps + 6;
+  if (!extraTurn && inOwnSide && nb[idx] === 1) {
+    const opp = oppPit(idx);   // correct formula: 12 - idx
+    if (opp >= 0 && nb[opp] > 0) {
+      nb[myK] += nb[opp] + 1;
+      nb[idx]  = 0;
+      nb[opp]  = 0;
+    }
+  }
+
+  // Collect remaining seeds when one side becomes empty
+  if (isTerminal(nb)) {
+    for(let i=0;i<6;i++)  { nb[6]  += nb[i]; nb[i]  = 0; }
+    for(let i=7;i<13;i++) { nb[13] += nb[i]; nb[i]  = 0; }
+  }
+
+  const nextSide = extraTurn ? s : 1 - s;
+  return { board: nb, side: nextSide, extraTurn };
+}
+
+function legalMoves(b, s) {
+  const ps = pitStart(s);
+  const moves = [];
+  for(let i=ps; i<ps+6; i++) if(b[i]>0) moves.push(i);
+  return moves;
+}
+
+// ═══════════════════════════════════════════════════════════
+// RENDERING
+// ═══════════════════════════════════════════════════════════
+function render() {
+  document.getElementById('kv0').textContent = board[6];
+  document.getElementById('kv1').textContent = board[13];
+
+  const legal = over || busy ? [] : legalMoves(board, side);
+  const legalSet = new Set(legal);
+
+  document.querySelectorAll('.pit').forEach(el => {
+    const idx = +el.dataset.pit;
+    el.querySelector('.pv').textContent = board[idx];
+    const clickable = legalSet.has(idx);
+    el.classList.toggle('on',  clickable);
+    el.classList.toggle('off', !clickable);
+  });
+
+  document.getElementById('t0').classList.toggle('show', side===0 && !over);
+  document.getElementById('t1').classList.toggle('show', side===1 && !over);
+
+  const mode = document.getElementById('gameMode').value;
+  // AI button: show when it's AI's turn in HvA, or always in AvA when not auto
+  const aiTurn = (mode==='hva' && side===1) || mode==='ava';
+  document.getElementById('btnAI').disabled = over || busy || !aiTurn;
+}
+
+function setStatus(msg, loading=false) {
+  document.getElementById('sm').textContent = msg;
+  document.getElementById('sb').classList.toggle('loading', loading);
+}
+
+function addHistory(pit, player, extra) {
+  const el = document.createElement('span');
+  el.className = `hi h${player}`;
+  el.textContent = `P${player}:pit${pit}${extra?'+':''}`;
+  const hl = document.getElementById('hlist');
+  hl.appendChild(el);
+  hl.scrollLeft = hl.scrollWidth;
+}
+
+function flashPit(pit, cls) {
+  const el = document.querySelector(`[data-pit="${pit}"]`);
+  if (!el) return;
+  el.classList.add(cls);
+  setTimeout(() => el.classList.remove(cls), 500);
+}
+
+function updateStats(data) {
+  document.getElementById('sAlgo').textContent    = data.stats.algo.toUpperCase();
+  document.getElementById('sMove').textContent    = `Pit ${data.move}`;
+  document.getElementById('sEval').textContent    = (+data.evaluation).toFixed(2);
+  document.getElementById('sTime').textContent    = data.elapsed_ms;
+  document.getElementById('sThreads').textContent = data.threads_used;
+  if (data.stats.algo === 'alphabeta') {
+    document.getElementById('sNodes').textContent   = (+data.stats.nodes).toLocaleString();
+    document.getElementById('sPrunes').textContent  = (+data.stats.prunes).toLocaleString();
+    document.getElementById('sWR').textContent      = '—';
+  } else {
+    document.getElementById('sNodes').textContent   = (+data.stats.rollouts).toLocaleString();
+    document.getElementById('sPrunes').textContent  = (+data.stats.tree_depth_avg).toFixed(1);
+    document.getElementById('sWR').textContent      = (+data.stats.win_rate).toFixed(3);
+  }
+}
+
+function checkGameOver() {
+  if (!isTerminal(board)) return false;
+  over = true;
+  const k0=board[6], k1=board[13];
+  let msg;
+  if (k0>k1)      msg = `🏆 ¡Gana Jugador 0! (${k0} vs ${k1})`;
+  else if (k1>k0) msg = `🏆 ¡Gana Jugador 1! (${k1} vs ${k0})`;
+  else            msg = `🤝 ¡Empate! (${k0} — ${k1})`;
+  setStatus(msg);
+  document.querySelector('.k0').classList.add('win-glow');
+  document.querySelector('.k1').classList.add('win-glow');
+  stopAuto();
+  return true;
+}
+
+// ═══════════════════════════════════════════════════════════
+// HUMAN MOVE
+// ═══════════════════════════════════════════════════════════
+function humanMove(pit) {
+  if (busy || over) return;
+  const mode = document.getElementById('gameMode').value;
+  if (mode === 'hva' && side !== 0) return;
+  if (mode === 'ava') return;  // no human clicks in AvA
+
+  const legal = legalMoves(board, side);
+  if (!legal.includes(pit)) return;
+
+  flashPit(pit, 'flash');
+  const prevSide = side;
+  const res = applyMove(board, side, pit);
+  board = res.board; side = res.side;
+  addHistory(pit, prevSide, res.extraTurn);
+  render();
+
+  if (checkGameOver()) return;
+
+  if (mode === 'hva' && side === 1) {
+    setTimeout(() => aiMove(), 350);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// AI MOVE (calls backend API)
+// ═══════════════════════════════════════════════════════════
+async function aiMove() {
+  if (busy || over) return;
+  busy = true;
+  render();
+
+  const algo    = document.getElementById('algo').value;
+  const threads = +document.getElementById('threads').value;
+  const apiUrl  = document.getElementById('apiUrl').value.replace(/\/$/, '');
+
+  const payload = { board, side, algo, threads };
+  if (algo === 'alphabeta') payload.depth       = +document.getElementById('depth').value;
+  else                       payload.simulations = +document.getElementById('sims').value;
+
+  setStatus(`IA calculando (${algo.toUpperCase()}, ${threads} hilo${threads>1?'s':''})…`, true);
+
+  try {
+    const r = await fetch(`${apiUrl}/move`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.detail || `HTTP ${r.status}`);
+    }
+
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+
+    updateStats(data);
+
+    const mv = data.move;
+    flashPit(mv, 'flash');
+
+    const prevSide = side;
+    const res = applyMove(board, side, mv);
+    board = res.board; side = res.side;
+    addHistory(mv, prevSide, res.extraTurn);
+
+    busy = false;
+    render();
+
+    if (checkGameOver()) return;
+
+    const mode = document.getElementById('gameMode').value;
+    setStatus(`P${side===0?'0 (tú)':'1 (IA)'} al turno · ${algo.toUpperCase()} tomó ${data.elapsed_ms}ms`);
+
+    // Continue AI vs AI auto loop
+    if (mode === 'ava' && auto) {
+      autoTmr = setTimeout(() => aiMove(), 300);
+    }
+    // In HvA if AI gets extra turn, keep going
+    if (mode === 'hva' && side === 1 && !over) {
+      autoTmr = setTimeout(() => aiMove(), 400);
+    }
+
+  } catch (err) {
+    busy = false;
+    render();
+    setStatus(`⚠ Error: ${err.message}`);
+    stopAuto();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════════════
+document.getElementById('btnNew').addEventListener('click', () => {
+  board = [4,4,4,4,4,4,0, 4,4,4,4,4,4,0];
+  side=0; over=false; busy=false;
+  stopAuto();
+  document.getElementById('hlist').innerHTML = '';
+  document.querySelector('.k0').classList.remove('win-glow');
+  document.querySelector('.k1').classList.remove('win-glow');
+  const mode = document.getElementById('gameMode').value;
+  setStatus(mode==='hva' ? 'Nueva partida. Es tu turno (P0).'
+                         : 'Nueva partida IA vs IA. Pulsa ▶ Auto o Mover IA.');
+  render();
+});
+
+document.getElementById('btnAI').addEventListener('click', () => { if(!busy&&!over) aiMove(); });
+
+document.getElementById('btnAuto').addEventListener('click', () => {
+  if (auto) { stopAuto(); return; }
+  auto = true;
+  document.getElementById('btnAuto').textContent = '⏸ Pause';
+  document.getElementById('btnAuto').classList.replace('btn-s','btn-p');
+  aiMove();
+});
+
+function stopAuto() {
+  auto = false;
+  if (autoTmr) { clearTimeout(autoTmr); autoTmr=null; }
+  document.getElementById('btnAuto').textContent = '▶ Auto';
+  document.getElementById('btnAuto').classList.replace('btn-p','btn-s');
+}
+
+document.getElementById('algo').addEventListener('change', () => {
+  const isAB = document.getElementById('algo').value === 'alphabeta';
+  document.getElementById('dg').style.display = isAB ? '' : 'none';
+  document.getElementById('sg').style.display = isAB ? 'none' : '';
+});
+
+document.getElementById('gameMode').addEventListener('change', () => {
+  stopAuto();
+  const lbl = document.querySelector('.p0-label');
+  const mode = document.getElementById('gameMode').value;
+  lbl.innerHTML = mode === 'hva'
+    ? `<span class="turn-badge show" id="t0" style="display:none">TURNO</span>Jugador 0 (Humano)<div class="dot"></div>`
+    : `<span class="turn-badge show" id="t0" style="display:none">TURNO</span>Jugador 0 (IA)<div class="dot"></div>`;
+  render();
+});
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+# ── C++ build artifacts ───────────────────────────────────────────────────────
+motor/build/
+motor/_deps/
+*.o
+*.a
+*.so
+mancala_server
+mancala_bench
+mancala_tests
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+.venv/
+venv/
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+*.tar
+
+# ── Kubernetes secrets (nunca commitear) ─────────────────────────────────────
+*-secret.yaml
+*-secrets.yaml
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Docs generados (no fuente) ────────────────────────────────────────────────
+*.pdf
+*.docx
+
+# ── SonarQube cache local ─────────────────────────────────────────────────────
+.scannerwork/
+
+# ── Node (por si se agrega tooling frontend) ──────────────────────────────────
+node_modules/
