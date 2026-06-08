@@ -8,12 +8,13 @@ Profesor: Carlos Andres Delgado S, Msc
 
 ## Integrantes del Grupo
 
-| Nombre Completo | Código | Correo Institucional |
-|-----------------|--------|----------------------|
-| David Stiven Mujanajinsoy Jajoy | 2376834 | david.mujanajinsoy@correounivalle.edu.co |
-| Jesus Alberto Tunubala Dagua| 2379924 | tunubala.jesus@correounivalle.edu.co |
-| Juan José Bolaños Serna | 2380616 | juan.bolanos.serna@correounivalle.edu.co |
-| Anderson Gomez Garcia | 2266242 | Gomez.anderson@correounivalle.edu.co |
+| **Nombres** | Codigo |
+|-------|-------------|
+| Juan David Agudelo | 2359519 |
+| Daniel Alexander Ramirez Gelviz | 2659652 |
+| David Stiven Mujanajinsoy Jajoy |2376834 |
+| Diego Andrés Bolaños Isiquita |2379918 |
+| Jesus Alberto Tunubala | 2379924  |
 
 > **IMPORTANTE:** Reemplaza los nombres, códigos y correos con los datos reales del grupo antes de hacer push.
 
