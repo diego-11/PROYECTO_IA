@@ -1,0 +1,70 @@
+# ── Mancala Kalah — Entorno de desarrollo local ───────────────────────────────
+# Uso (desde la raíz del proyecto mancala-fixed/):
+#   docker compose -f deploy/local/docker-compose.yml up --build
+# Acceso frontend: http://localhost:8080
+# Acceso API:      http://localhost:8000/docs
+
+services:
+
+  # ── Motor C++/OpenMP ────────────────────────────────────────────────────────
+  motor:
+    build:
+      context: ../../motor
+      dockerfile: Dockerfile
+    container_name: mancala-motor
+    environment:
+      OMP_NUM_THREADS: "4"
+    expose:
+      - "8001"
+    networks:
+      - mancala-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8001/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── Backend FastAPI ─────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    container_name: mancala-backend
+    ports:
+      - "8000:8000"
+    environment:
+      MOTOR_URL: "http://motor:8001"
+      CORS_ORIGINS: "http://localhost:8080,http://127.0.0.1:8080"
+    depends_on:
+      motor:
+        condition: service_healthy
+    networks:
+      - mancala-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── Frontend nginx ──────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+    container_name: mancala-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - mancala-net
+    restart: unless-stopped
+
+networks:
+  mancala-net:
+    driver: bridge

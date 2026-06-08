@@ -1,0 +1,12 @@
+# Posiciones de prueba para Mancala Kalah(6,4)
+# Formato: 14 enteros (pits[0..13]) + side (0 o 1)
+# Posicion inicial
+4 4 4 4 4 4 0 4 4 4 4 4 4 0 0
+# Medio juego - P0 ventaja
+0 2 6 0 3 1 8 0 4 2 0 5 3 12 1
+# Final de juego
+0 0 1 0 0 2 20 0 0 3 0 0 1 21 0
+# Posicion con turno extra disponible
+4 4 4 4 4 2 0 4 4 4 4 4 4 0 0
+# Posicion de captura posible
+0 3 0 4 4 4 2 4 4 4 4 4 4 0 0

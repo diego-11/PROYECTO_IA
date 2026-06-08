@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: motor-config
+  namespace: mancala
+data:
+  OMP_NUM_THREADS: "4"
+  DEFAULT_DEPTH: "8"
+  DEFAULT_SIMULATIONS: "10000"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: mancala
+data:
+  MOTOR_URL: "http://motor-svc:8001"
+  CORS_ORIGINS: "http://frontend-svc,http://localhost:8080,http://192.168.49.2:30080"
